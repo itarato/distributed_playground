@@ -20,15 +20,15 @@ impl Default for ChannelState {
     }
 }
 
-pub struct Channel {
+pub struct Channel<T> {
     id: Uuid,
-    queue: VecDeque<Event>,
+    queue: VecDeque<Event<T>>,
     state: ChannelState,
     source: Uuid,
     target: Uuid,
 }
 
-impl Channel {
+impl<T> Channel<T> {
     pub(crate) fn new(source: Uuid, target: Uuid) -> Self {
         Self {
             id: Uuid::new_v4(),
@@ -39,15 +39,15 @@ impl Channel {
         }
     }
 
-    pub(crate) fn consume_ready(&mut self) -> Vec<Event> {
-        unimplemented!()
+    pub(crate) fn consume_ready(&mut self) -> Vec<Event<T>> {
+        self.queue.drain(..).collect()
     }
 
     pub(crate) fn id(&self) -> Uuid {
         self.id
     }
 
-    pub(crate) fn push_event(&mut self, event: Event) {
+    pub(crate) fn push_event(&mut self, event: Event<T>) {
         self.queue.push_back(event);
     }
 }

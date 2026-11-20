@@ -2,21 +2,30 @@ use std::collections::HashMap;
 
 use uuid::Uuid;
 
-use crate::{business::BusinessCore, channel::Channel, event::Event, node::Node};
+use crate::{
+    business::{BusinessCore, BusinessResult},
+    channel::Channel,
+    event::Event,
+    node::Node,
+};
 
 #[derive(Default)]
-pub struct Simulation {
+pub struct Simulation<Payload> {
     ticker: u64,
-    nodes: HashMap<Uuid, Node>,
-    channels: HashMap<Uuid, Channel>,
+    nodes: HashMap<Uuid, Node<Payload>>,
+    nodes_by_name: HashMap<String, Uuid>,
+    channels: HashMap<Uuid, Channel<Payload>>,
     edges: HashMap<(Uuid /* source node */, Uuid /* target node */), Uuid /* channel */>,
 }
 
-impl Simulation {
-    pub fn add_node(&mut self, core: Box<dyn BusinessCore>) -> Uuid {
+impl<Payload> Simulation<Payload> {
+    pub fn add_node(&mut self, core: Box<dyn BusinessCore<PayloadType = Payload>>) -> Uuid {
         let node = Node::new(core);
         let id = node.id();
+
+        self.nodes_by_name.insert(node.name(), id);
         self.nodes.insert(node.id(), node);
+
         id
     }
 
@@ -28,27 +37,44 @@ impl Simulation {
     }
 
     pub fn run(&mut self, limit: u64) {
-        while self.ticker < limit {
+        'outer: while self.ticker < limit {
             // Business cycles.
             for (_, node) in self.nodes.iter_mut() {
-                for intent in node.tick(self.ticker) {
-                    let ch_id = match self.edges.get(&(node.id(), intent.target)) {
-                        Some(ch_id) => ch_id,
-                        None => {
-                            eprint!(
-                                "Error: no comms declared between node {} and {}.",
-                                node.id(),
-                                intent.target
-                            );
-                            continue;
-                        }
-                    };
+                match node.tick(self.ticker) {
+                    BusinessResult::Events(business_events) => {
+                        for business_event in business_events {
+                            let target_node_id = if let Some(target_node_id) =
+                                self.nodes_by_name.get(&business_event.target)
+                            {
+                                target_node_id
+                            } else {
+                                eprintln!("Error: node not found: {}", business_event.target);
+                                continue;
+                            };
 
-                    let event = Event::new(node.id(), intent.target, self.ticker, intent.payload);
-                    self.channels
-                        .get_mut(ch_id)
-                        .expect("Missing channel")
-                        .push_event(event);
+                            let ch_id = match self.edges.get(&(node.id(), *target_node_id)) {
+                                Some(ch_id) => ch_id,
+                                None => {
+                                    eprint!(
+                                        "Error: no comms declared between node {} and {}.",
+                                        node.id(),
+                                        target_node_id
+                                    );
+                                    continue;
+                                }
+                            };
+
+                            let event =
+                                Event::new(node.id(), *target_node_id, self.ticker, business_event);
+                            self.channels
+                                .get_mut(ch_id)
+                                .expect("Missing channel")
+                                .push_event(event);
+                        }
+                    }
+                    BusinessResult::Halt => {
+                        break 'outer;
+                    }
                 }
             }
 

@@ -1,21 +1,24 @@
 use uuid::Uuid;
 
-use crate::{business::BusinessCore, event::Event};
+use crate::{
+    business::{BusinessCore, BusinessResult},
+    event::Event,
+};
 
 #[derive(Default)]
 struct NodeState {
     dead: bool,
 }
 
-pub struct Node {
+pub struct Node<Payload> {
     id: Uuid,
     state: NodeState,
-    core: Box<dyn BusinessCore>,
-    incoming_events: Vec<Event>,
+    core: Box<dyn BusinessCore<PayloadType = Payload>>,
+    incoming_events: Vec<Event<Payload>>,
 }
 
-impl Node {
-    pub fn new(core: Box<dyn BusinessCore>) -> Self {
+impl<Payload> Node<Payload> {
+    pub fn new(core: Box<dyn BusinessCore<PayloadType = Payload>>) -> Self {
         Self {
             id: Uuid::new_v4(),
             state: NodeState::default(),
@@ -24,16 +27,25 @@ impl Node {
         }
     }
 
-    pub(crate) fn push_event(&mut self, event: Event) {
+    pub(crate) fn push_event(&mut self, event: Event<Payload>) {
         self.incoming_events.push(event);
     }
 
-    pub(crate) fn tick(&mut self, tick: u64) -> Vec<Event> {
-        self.core
-            .tick(tick, self.incoming_events.drain(..).collect())
+    pub(crate) fn tick(&mut self, tick: u64) -> BusinessResult<Payload> {
+        self.core.tick(
+            tick,
+            self.incoming_events
+                .drain(..)
+                .map(|e| e.business_event)
+                .collect(),
+        )
     }
 
     pub(crate) fn id(&self) -> Uuid {
         self.id
+    }
+
+    pub(crate) fn name(&self) -> String {
+        self.core.name()
     }
 }
