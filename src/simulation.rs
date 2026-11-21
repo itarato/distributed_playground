@@ -45,9 +45,11 @@ impl<Payload> Simulation<Payload> {
     }
 
     pub fn run(&mut self, limit: u64) {
-        info!("Simulation has started");
+        info!("Simulation has started (limit: {} steps)", limit);
 
-        'outer: while self.ticker < limit {
+        let ticker_end = self.ticker + limit;
+
+        'outer: while self.ticker < ticker_end {
             // Business cycles.
             for (_, node) in self.nodes.iter_mut() {
                 match node.tick(self.ticker) {

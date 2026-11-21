@@ -5,18 +5,22 @@ use uuid::Uuid;
 use crate::event::Event;
 
 pub struct ChannelState {
-    out_of_order: f32,
+    out_of_order: usize,
     delay: f32,
     active: bool,
 }
 
-impl Default for ChannelState {
-    fn default() -> Self {
+impl ChannelState {
+    fn new() -> Self {
         Self {
-            out_of_order: 0.0,
+            out_of_order: 0,
             delay: 0.0,
             active: true,
         }
+    }
+
+    pub fn set_out_of_order(&mut self, value: usize) {
+        self.out_of_order = value;
     }
 }
 
@@ -33,7 +37,7 @@ impl<T> Channel<T> {
         Self {
             id: Uuid::new_v4(),
             queue: VecDeque::default(),
-            state: ChannelState::default(),
+            state: ChannelState::new(),
             source,
             target,
         }

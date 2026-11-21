@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 log = "0.4.35"
+rand = "0.10.4"
 
 [dependencies.uuid]
 version = "1.29.3"
