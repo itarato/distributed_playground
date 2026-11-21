@@ -127,3 +127,17 @@ fn test_client_node_dead() {
 
     assert_eq!(0, setup.client_history.borrow().len());
 }
+
+#[test]
+fn test_server_node_dead() {
+    let mut setup = EchoServer::new();
+    setup
+        .sim
+        .node_state_mut(&setup.server_node_id)
+        .unwrap()
+        .set_alive(false);
+
+    setup.sim.run(10);
+
+    assert_eq!(0, setup.client_history.borrow().len());
+}
