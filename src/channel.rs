@@ -4,10 +4,10 @@ use uuid::Uuid;
 
 use crate::event::Event;
 
-struct ChannelState {
+pub struct ChannelState {
     out_of_order: f32,
     delay: f32,
-    dead: bool,
+    active: bool,
 }
 
 impl Default for ChannelState {
@@ -15,7 +15,7 @@ impl Default for ChannelState {
         Self {
             out_of_order: 0.0,
             delay: 0.0,
-            dead: false,
+            active: true,
         }
     }
 }
@@ -49,5 +49,9 @@ impl<T> Channel<T> {
 
     pub(crate) fn push_event(&mut self, event: Event<T>) {
         self.queue.push_back(event);
+    }
+
+    pub(crate) fn state_mut(&mut self) -> &mut ChannelState {
+        &mut self.state
     }
 }

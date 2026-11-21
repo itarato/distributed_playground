@@ -5,9 +5,18 @@ use crate::{
     event::Event,
 };
 
-#[derive(Default)]
-struct NodeState {
-    dead: bool,
+pub struct NodeState {
+    alive: bool,
+}
+
+impl NodeState {
+    pub(crate) fn new() -> Self {
+        Self { alive: true }
+    }
+
+    pub fn set_alive(&mut self, value: bool) {
+        self.alive = value;
+    }
 }
 
 pub struct Node<Payload> {
@@ -21,7 +30,7 @@ impl<Payload> Node<Payload> {
     pub fn new(core: Box<dyn BusinessCore<PayloadType = Payload>>) -> Self {
         Self {
             id: Uuid::new_v4(),
-            state: NodeState::default(),
+            state: NodeState::new(),
             core,
             incoming_events: vec![],
         }
@@ -32,20 +41,28 @@ impl<Payload> Node<Payload> {
     }
 
     pub(crate) fn tick(&mut self, tick: u64) -> BusinessResult<Payload> {
-        self.core.tick(
-            tick,
-            self.incoming_events
-                .drain(..)
-                .map(|e| e.business_event)
-                .collect(),
-        )
+        let events = self
+            .incoming_events
+            .drain(..)
+            .map(|e| e.business_event)
+            .collect();
+
+        if self.state.alive {
+            self.core.tick(tick, events)
+        } else {
+            BusinessResult::Events(vec![])
+        }
     }
 
-    pub(crate) fn id(&self) -> Uuid {
+    pub fn id(&self) -> Uuid {
         self.id
     }
 
     pub(crate) fn name(&self) -> String {
         self.core.name()
+    }
+
+    pub fn state_mut(&mut self) -> &mut NodeState {
+        &mut self.state
     }
 }

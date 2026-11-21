@@ -4,8 +4,12 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+log = "0.4.35"
 
 [dependencies.uuid]
 version = "1.29.3"
-# Lets you generate random UUIDs
 features = ["v4"]
+
+[dev-dependencies]
+pretty_env_logger = "=0.1.1"
+env_logger = "0.11.12"

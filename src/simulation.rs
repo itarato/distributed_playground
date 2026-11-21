@@ -1,12 +1,13 @@
 use std::collections::HashMap;
 
+use log::{error, info};
 use uuid::Uuid;
 
 use crate::{
     business::{BusinessCore, BusinessResult},
-    channel::Channel,
+    channel::{Channel, ChannelState},
     event::Event,
-    node::Node,
+    node::{Node, NodeState},
 };
 
 #[derive(Default)]
@@ -19,24 +20,33 @@ pub struct Simulation<Payload> {
 }
 
 impl<Payload> Simulation<Payload> {
-    pub fn add_node(&mut self, core: Box<dyn BusinessCore<PayloadType = Payload>>) -> Uuid {
+    pub fn create_node(&mut self, core: Box<dyn BusinessCore<PayloadType = Payload>>) -> Uuid {
         let node = Node::new(core);
         let id = node.id();
 
+        info!("Adding node <{}> as <{}>", node.name(), id);
+
         self.nodes_by_name.insert(node.name(), id);
-        self.nodes.insert(node.id(), node);
+        self.nodes.insert(id, node);
 
         id
     }
 
-    pub fn connect(&mut self, lhs_node_id: Uuid, rhs_node_id: Uuid) {
+    pub fn connect(&mut self, lhs_node_id: Uuid, rhs_node_id: Uuid) -> Uuid {
         let ch = Channel::new(lhs_node_id, rhs_node_id);
+        let id = ch.id();
+
+        info!("Establish connection from <{lhs_node_id}> to <{rhs_node_id}>");
 
         self.edges.insert((lhs_node_id, rhs_node_id), ch.id());
-        self.channels.insert(ch.id(), ch);
+        self.channels.insert(id, ch);
+
+        id
     }
 
     pub fn run(&mut self, limit: u64) {
+        info!("Simulation has started");
+
         'outer: while self.ticker < limit {
             // Business cycles.
             for (_, node) in self.nodes.iter_mut() {
@@ -48,15 +58,15 @@ impl<Payload> Simulation<Payload> {
                             {
                                 target_node_id
                             } else {
-                                eprintln!("Error: node not found: {}", business_event.target);
+                                error!("Node not found: {}", business_event.target);
                                 continue;
                             };
 
                             let ch_id = match self.edges.get(&(node.id(), *target_node_id)) {
                                 Some(ch_id) => ch_id,
                                 None => {
-                                    eprint!(
-                                        "Error: no comms declared between node {} and {}.",
+                                    error!(
+                                        "No channel declared between node {} and {}.",
                                         node.id(),
                                         target_node_id
                                     );
@@ -66,10 +76,11 @@ impl<Payload> Simulation<Payload> {
 
                             let event =
                                 Event::new(node.id(), *target_node_id, self.ticker, business_event);
-                            self.channels
-                                .get_mut(ch_id)
-                                .expect("Missing channel")
-                                .push_event(event);
+
+                            match self.channels.get_mut(ch_id) {
+                                Some(channel) => channel.push_event(event),
+                                None => error!("Node not found"),
+                            }
                         }
                     }
                     BusinessResult::Halt => {
@@ -81,14 +92,22 @@ impl<Payload> Simulation<Payload> {
             // Sending outgoing messages.
             for (_, channel) in self.channels.iter_mut() {
                 for event in channel.consume_ready() {
-                    self.nodes
-                        .get_mut(&event.target)
-                        .expect("Missing node")
-                        .push_event(event);
+                    match self.nodes.get_mut(&event.target) {
+                        Some(node) => node.push_event(event),
+                        None => error!("Missing node"),
+                    }
                 }
             }
 
             self.ticker += 1;
         }
+    }
+
+    pub fn node_state_mut(&mut self, id: &Uuid) -> Option<&mut NodeState> {
+        self.nodes.get_mut(id).map(|node| node.state_mut())
+    }
+
+    pub fn channel_state_mut(&mut self, id: &Uuid) -> Option<&mut ChannelState> {
+        self.channels.get_mut(id).map(|channel| channel.state_mut())
     }
 }
