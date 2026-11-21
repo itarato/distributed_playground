@@ -1,8 +1,6 @@
-use std::collections::VecDeque;
-
-use uuid::Uuid;
-
 use crate::event::Event;
+use std::collections::VecDeque;
+use uuid::Uuid;
 
 pub struct ChannelState {
     out_of_order: usize,
@@ -44,6 +42,10 @@ impl<T> Channel<T> {
     }
 
     pub(crate) fn consume_ready(&mut self) -> Vec<Event<T>> {
+        if !self.state.active {
+            return vec![];
+        }
+
         self.queue.drain(..).collect()
     }
 
@@ -52,7 +54,16 @@ impl<T> Channel<T> {
     }
 
     pub(crate) fn push_event(&mut self, event: Event<T>) {
-        self.queue.push_back(event);
+        if !self.state.active {
+            return;
+        }
+
+        if self.state.out_of_order == 0 || self.queue.is_empty() {
+            self.queue.push_back(event);
+        } else {
+            let random_pos = rand::random::<u32>() % self.queue.len() as u32;
+            self.queue.insert(random_pos as usize, event);
+        }
     }
 
     pub(crate) fn state_mut(&mut self) -> &mut ChannelState {
