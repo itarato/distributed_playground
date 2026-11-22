@@ -3,3 +3,4 @@ mod channel;
 mod event;
 mod node;
 pub mod simulation;
+mod util;

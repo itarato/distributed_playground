@@ -1,9 +1,11 @@
+use core::error;
 use std::{cell::RefCell, rc::Rc};
 
 use distributed_playground::{
     business::{BusinessCore, BusinessEvent, BusinessResult},
     simulation::Simulation,
 };
+use log::error;
 use uuid::Uuid;
 
 struct ClientCore {
@@ -197,7 +199,7 @@ fn test_channel_out_of_order() {
         .sim
         .channel_state_mut(&setup.client_to_server_channel_id)
         .unwrap()
-        .set_out_of_order(5);
+        .set_out_of_order_section(5);
 
     setup.sim.run(22);
     assert_eq!(100, setup.client_history.borrow().len());
@@ -211,4 +213,25 @@ fn test_channel_out_of_order() {
     }
 
     assert!(bad_order_count > 0);
+}
+
+#[test]
+fn test_channel_delay() {
+    let mut setup = EchoServer::new_custom(1);
+
+    setup
+        .sim
+        .channel_state_mut(&setup.client_to_server_channel_id)
+        .unwrap()
+        .set_delay(10);
+
+    setup.sim.run(102);
+    assert_eq!(90, setup.client_history.borrow().len());
+
+    for i in 0..setup.client_history.borrow().len() {
+        assert_eq!(
+            format!("Hello, {} world!", i),
+            setup.client_history.borrow()[i]
+        );
+    }
 }

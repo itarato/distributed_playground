@@ -93,7 +93,7 @@ impl<Payload> Simulation<Payload> {
 
             // Sending outgoing messages.
             for (_, channel) in self.channels.iter_mut() {
-                for event in channel.consume_ready() {
+                for event in channel.consume_ready(self.ticker) {
                     match self.nodes.get_mut(&event.target) {
                         Some(node) => node.push_event(event),
                         None => error!("Missing node"),

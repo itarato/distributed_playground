@@ -3,22 +3,26 @@ use std::collections::VecDeque;
 use uuid::Uuid;
 
 pub struct ChannelState {
-    out_of_order: usize,
-    delay: f32,
+    out_of_order_section: usize,
+    delay: u64,
     active: bool,
 }
 
 impl ChannelState {
     fn new() -> Self {
         Self {
-            out_of_order: 0,
-            delay: 0.0,
+            out_of_order_section: 0,
+            delay: 0,
             active: true,
         }
     }
 
-    pub fn set_out_of_order(&mut self, value: usize) {
-        self.out_of_order = value;
+    pub fn set_out_of_order_section(&mut self, value: usize) {
+        self.out_of_order_section = value;
+    }
+
+    pub fn set_delay(&mut self, value: u64) {
+        self.delay = value;
     }
 }
 
@@ -41,12 +45,22 @@ impl<T> Channel<T> {
         }
     }
 
-    pub(crate) fn consume_ready(&mut self) -> Vec<Event<T>> {
+    pub(crate) fn consume_ready(&mut self, tick: u64) -> Vec<Event<T>> {
         if !self.state.active {
             return vec![];
         }
 
-        self.queue.drain(..).collect()
+        let mut out = vec![];
+
+        while !self.queue.is_empty() {
+            if self.queue.front().unwrap().t_create + self.state.delay > tick {
+                break;
+            }
+
+            out.push(self.queue.pop_front().unwrap());
+        }
+
+        out
     }
 
     pub(crate) fn id(&self) -> Uuid {
@@ -58,7 +72,7 @@ impl<T> Channel<T> {
             return;
         }
 
-        if self.state.out_of_order == 0 || self.queue.is_empty() {
+        if self.state.out_of_order_section == 0 || self.queue.is_empty() {
             self.queue.push_back(event);
         } else {
             let random_pos = rand::random::<u32>() % self.queue.len() as u32;
