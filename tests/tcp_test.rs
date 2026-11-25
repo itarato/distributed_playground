@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use distributed_playground::business::BusinessCore;
 
 struct TcpMessage {
@@ -11,8 +13,6 @@ struct TcpMessage {
 
 #[derive(PartialEq, Eq)]
 enum ServerState {
-    Closed,
-    Listen,
     SynSent,
     SynReceived,
     Established,
@@ -24,10 +24,19 @@ enum Task {
     SendMessage,
 }
 
-struct ServerCore {
+struct Connection {
     state: ServerState,
+    data_received: Vec<u8>,
+}
+
+struct Socket {
+    listening: bool,
+    connections: HashMap<String, Connection>,
+}
+
+struct ServerCore {
     name: String,
-    task: Task,
+    socket: Socket,
 }
 
 impl BusinessCore for ServerCore {
