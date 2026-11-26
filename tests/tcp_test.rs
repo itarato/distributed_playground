@@ -2,6 +2,8 @@ use std::collections::HashMap;
 
 use distributed_playground::business::BusinessCore;
 
+use crate::SocketState::Closed;
+
 struct TcpMessage {
     source: String,
     seq_num: u32,
@@ -12,31 +14,58 @@ struct TcpMessage {
 }
 
 #[derive(PartialEq, Eq)]
-enum ServerState {
+enum ConnectionState {
+    Closed,
     SynSent,
     SynReceived,
     Established,
 }
 
-enum Task {
-    Nothing,
-    Listen,
-    SendMessage,
+enum ConnectionGoal {
+    Send,
+    ReactOnly,
 }
 
 struct Connection {
-    state: ServerState,
+    state: ConnectionState,
+    target: String,
     data_received: Vec<u8>,
 }
 
+impl Connection {
+    fn new(target: String) -> Self {
+        Self {
+            state: ConnectionState::Closed,
+            target,
+            data_received: vec![],
+        }
+    }
+}
+
+enum SocketState {
+    Closed,
+    Listening,
+}
+
 struct Socket {
+    state: SocketState,
     listening: bool,
-    connections: HashMap<String, Connection>,
+}
+
+impl Socket {
+    fn new() -> Self {
+        Self {
+            state: SocketState::Listening,
+            listening: false,
+        }
+    }
 }
 
 struct ServerCore {
     name: String,
-    socket: Socket,
+    sockets: HashMap<String, Socket>,
+    connections: HashMap<String, Connection>,
+    send_target: Option<String>,
 }
 
 impl BusinessCore for ServerCore {
@@ -51,13 +80,12 @@ impl BusinessCore for ServerCore {
         tick: u64,
         events: Vec<distributed_playground::business::BusinessEvent<Self::PayloadType>>,
     ) -> distributed_playground::business::BusinessResult<Self::PayloadType> {
-        if self.state == ServerState::Closed {
-            match self.task {
-                Task::SendMessage => {}
-                Task::Listen => {
-                    self.state = ServerState::Listen;
-                }
-                Task::Nothing => {}
+        if tick == 0 {
+            if let Some(target) = self.send_target.as_ref() {
+                assert!(self.sockets.get(&self.name).unwrap().listening);
+
+                self.connections
+                    .insert(target.clone(), Connection::new(target.clone()));
             }
         }
 
@@ -66,11 +94,18 @@ impl BusinessCore for ServerCore {
 }
 
 impl ServerCore {
-    fn new(name: String, task: Task) -> Self {
+    fn new(name: String, is_listening: bool, send_target: Option<String>) -> Self {
+        let sockets = if is_listening && send_target.is_some() {
+            HashMap::from([(name.clone(), Socket::new())])
+        } else {
+            HashMap::new()
+        };
+
         Self {
-            state: ServerState::Closed,
             name,
-            task,
+            connections: HashMap::new(),
+            sockets,
+            send_target,
         }
     }
 }
