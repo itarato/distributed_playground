@@ -1,8 +1,6 @@
 use std::collections::HashMap;
 
-use distributed_playground::business::BusinessCore;
-
-use crate::SocketState::Closed;
+use distributed_playground::business::{BusinessCore, BusinessEvent, BusinessResult};
 
 struct TcpMessage {
     source: String,
@@ -30,14 +28,16 @@ struct Connection {
     state: ConnectionState,
     target: String,
     data_received: Vec<u8>,
+    goal: ConnectionGoal,
 }
 
 impl Connection {
-    fn new(target: String) -> Self {
+    fn new(target: String, goal: ConnectionGoal) -> Self {
         Self {
             state: ConnectionState::Closed,
             target,
             data_received: vec![],
+            goal,
         }
     }
 }
@@ -78,18 +78,24 @@ impl BusinessCore for ServerCore {
     fn tick(
         &mut self,
         tick: u64,
-        events: Vec<distributed_playground::business::BusinessEvent<Self::PayloadType>>,
+        events: Vec<BusinessEvent<Self::PayloadType>>,
     ) -> distributed_playground::business::BusinessResult<Self::PayloadType> {
         if tick == 0 {
             if let Some(target) = self.send_target.as_ref() {
                 assert!(self.sockets.get(&self.name).unwrap().listening);
 
-                self.connections
-                    .insert(target.clone(), Connection::new(target.clone()));
+                self.connections.insert(
+                    target.clone(),
+                    Connection::new(target.clone(), ConnectionGoal::Send),
+                );
             }
         }
 
-        unimplemented!()
+        let mut out_events = vec![];
+
+        for (host, conn) in &self.connections {}
+
+        BusinessResult::Events(out_events)
     }
 }
 
